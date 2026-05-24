@@ -69,8 +69,23 @@ def fetch_fred_series(
         dates.append(pd.Timestamp(row["date"]))
         values.append(float(raw))
 
-    series = pd.Series(values, index=pd.DatetimeIndex(dates, name="date"), name=series_id.lower())
+    name = series_id.lower()
+    series = pd.Series(values, index=pd.DatetimeIndex(dates, name="date"), name=name)
     return series.sort_index()
+
+
+def fetch_fred_weekly_to_monthly(
+    series_id: str,
+    start: str = DEFAULT_START,
+    api_key: str | None = None,
+) -> pd.Series:
+    """Fetch a weekly FRED series and resample to month-end means."""
+    weekly = fetch_fred_series(series_id, start=start, api_key=api_key)
+    if weekly.empty:
+        return weekly
+    monthly = weekly.resample("ME").mean()
+    monthly.name = series_id.lower()
+    return monthly.dropna()
 
 
 def _download_if_missing(url: str, path: Path) -> None:
@@ -170,7 +185,8 @@ def build_master_frame(
     """
     Build a quarterly merged DataFrame from SPF, FRED, and NY Fed sources.
 
-    Columns: spf_cpi_1yr, gscpi, mich, umcsent (all quarterly means where applicable).
+    Columns include spf_cpi_1yr, gscpi, mich, umcsent, gasregw (weekly gasoline
+    prices averaged to monthly, then to quarterly), and unrate (civilian unemployment).
     Index: quarter-end DatetimeIndex.
     """
     spf = load_spf_inflation()
@@ -179,12 +195,22 @@ def build_master_frame(
     gscpi_m = fetch_gscpi_monthly(start=start)
     mich_m = fetch_fred_series("MICH", start=start, api_key=api_key)
     umcsent_m = fetch_fred_series("UMCSENT", start=start, api_key=api_key)
+    gasregw_m = fetch_fred_weekly_to_monthly("GASREGW", start=start, api_key=api_key)
+    unrate_m = fetch_fred_series("UNRATE", start=start, api_key=api_key)
 
     gscpi_q = _monthly_to_quarterly(gscpi_m).to_frame()
     mich_q = _monthly_to_quarterly(mich_m).to_frame()
     umcsent_q = _monthly_to_quarterly(umcsent_m).to_frame()
+    gasregw_q = _monthly_to_quarterly(gasregw_m).to_frame()
+    unrate_q = _monthly_to_quarterly(unrate_m).to_frame()
 
-    quarterly = spf_q.join(gscpi_q, how="outer").join(mich_q, how="outer").join(umcsent_q, how="outer")
+    quarterly = (
+        spf_q.join(gscpi_q, how="outer")
+        .join(mich_q, how="outer")
+        .join(umcsent_q, how="outer")
+        .join(gasregw_q, how="outer")
+        .join(unrate_q, how="outer")
+    )
     quarterly = quarterly.sort_index()
     quarterly = quarterly.loc[quarterly.index >= pd.Timestamp(start)]
     quarterly = quarterly.interpolate(method="time", limit_direction="both", limit=2)
@@ -201,4 +227,6 @@ def fetch_monthly_for_plots(
         "gscpi": fetch_gscpi_monthly(start=start),
         "mich": fetch_fred_series("MICH", start=start, api_key=api_key),
         "umcsent": fetch_fred_series("UMCSENT", start=start, api_key=api_key),
+        "gasregw": fetch_fred_weekly_to_monthly("GASREGW", start=start, api_key=api_key),
+        "unrate": fetch_fred_series("UNRATE", start=start, api_key=api_key),
     }

@@ -29,6 +29,8 @@ streamlit run app.py
 | GSCPI | [NY Fed GSCPI](https://www.newyorkfed.org/research/policy/gscpi) interactive CSV | Monthly |
 | MICH | [FRED MICH](https://fred.stlouisfed.org/series/MICH) | Monthly |
 | UMCSENT | [FRED UMCSENT](https://fred.stlouisfed.org/series/UMCSENT) | Monthly |
+| GASREGW | [FRED GASREGW](https://fred.stlouisfed.org/series/GASREGW) | Weekly → monthly mean → quarterly |
+| UNRATE | [FRED UNRATE](https://fred.stlouisfed.org/series/UNRATE) | Monthly |
 | SPF 1-yr CPI | [Philadelphia Fed Inflation.xlsx](https://www.philadelphiafed.org/surveys-and-data/real-time-data-research/inflation-forecasts) (`INFCPI1YR`) | Quarterly |
 
 Monthly FRED and GSCPI series are resampled to **quarter-end means** before merging with SPF.
@@ -37,6 +39,7 @@ Monthly FRED and GSCPI series are resampled to **quarter-end means** before merg
 
 - `src/data_loader.py` — fetch, resample, merge
 - `src/plots.py` — matplotlib figures
+- `src/analytics.py` — rolling correlation and Granger causality tests
 - `dashboard.ipynb` — analysis notebook
 - `app.py` — Streamlit UI
 
